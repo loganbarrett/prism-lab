@@ -3,6 +3,7 @@
   --navy:#101229; --navy-2:#171a3a; --navy-3:#1f2350; --iris:#7155D9; --blue:#4A90E2; --cyan:#36CFC9; --pink:#EF78B3; --gold:#F2C572; --white:#F7F8FC;
   --iris-text:#A794F0; --muted:#B4B8D6; --line:rgba(247,248,252,.14);
   --grad:linear-gradient(100deg,var(--pink),var(--iris) 38%,var(--blue) 68%,var(--cyan));
+  --grad-btn:linear-gradient(100deg,#EF78B3,#A08AF2 38%,#5FA3EA 68%,#36CFC9);
   --font-head:"Space Grotesk",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif; --font-mono:"IBM Plex Mono",ui-monospace,monospace;
   --radius:16px; --accent:var(--iris); --accent-text:var(--iris-text);
 }
@@ -50,7 +51,7 @@ header.site{position:sticky;top:0;z-index:50;background:rgba(16,18,41,.88);backd
 /* buttons */
 .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.8rem 1.4rem;border-radius:999px;font:600 1rem var(--font-head);text-decoration:none;border:2px solid transparent;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .btn:hover{transform:translateY(-2px)}
-.btn-primary{background:var(--grad);color:#101229}.btn-primary:hover{color:#101229;box-shadow:0 8px 28px rgba(113,85,217,.45)}
+.btn-primary{background:var(--grad-btn);color:#101229}.btn-primary:hover{color:#101229;box-shadow:0 8px 28px rgba(113,85,217,.45)}
 .btn-ghost{border-color:rgba(247,248,252,.55);color:#fff;background:transparent}.btn-ghost:hover{background:rgba(255,255,255,.08)}
 .btn-sm{padding:.45rem 1rem;font-size:.9rem}
 

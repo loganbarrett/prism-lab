@@ -38,9 +38,11 @@
   let T = null; // loaded THREE objects
 
   async function load() {
-    const url = 'assets/data/brain.bin.gz';
+    const lite = /detail=low/.test(location.search) || (!/detail=high/.test(location.search) && (matchMedia('(pointer: coarse)').matches || innerWidth < 700 || (navigator.connection && navigator.connection.saveData)));
+    const url = lite ? 'assets/data/brain_lite.bin.gz' : 'assets/data/brain.bin.gz';
     const r = await fetch(url); if (!r.ok) throw new Error('mesh ' + r.status);
-    const buf = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const raw = await r.arrayBuffer(), u = new Uint8Array(raw, 0, 2);     // some hosts add Content-Encoding and the browser has already unzipped it
+    const buf = u[0] === 0x1f && u[1] === 0x8b ? await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : raw;
     const dv = new DataView(buf), nV = dv.getUint32(0, true), nF = dv.getUint32(4, true), dV = dv.getUint32(8, true), dF = dv.getUint32(12, true);
     const c = [dv.getFloat32(16, true), dv.getFloat32(20, true), dv.getFloat32(24, true)], s = dv.getFloat32(28, true);
     let o = 32; const take = (Ctor, n) => { const a = new Ctor(buf, o, n); o += Math.ceil(a.byteLength / 4) * 4; return a; };
@@ -171,6 +173,6 @@
   }
 
   if (!PRISM.webgl() || typeof DecompressionStream === 'undefined') { document.documentElement.classList.add('no-webgl'); GROUPS.forEach(g => host.append(PRISM.el('p', { text: g.name + ': ' + g.t, class: 'muted' }))); return; }
-  if (status) status.textContent = 'Loading cortical surface (2.7 MB)…';
+  if (status) status.textContent = 'Loading cortical surface…';
   load().then(start).catch(err => { if (status) status.textContent = 'Could not load the 3D surface (' + err.message + '). Region descriptions are listed below.'; GROUPS.forEach(g => host.append(PRISM.el('p', { text: g.name + ': ' + g.t, class: 'muted' }))); });
 })();

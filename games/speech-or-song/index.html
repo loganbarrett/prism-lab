@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Speech or Song?</title>
+<meta name="description" content="Swipe left for speech, right for song. Then hear the phrase repeat and decide again.">
+<style>
+:root{ --bg:#0b1020; --ink:#fff; --muted:#b9c2d9; --speech:#4cc3ff; --song:#ff7ad9; --panel:#18203a; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100vh; min-height:100dvh; color:var(--ink);
+  background:radial-gradient(120% 80% at 50% 0%, #1f2f66 0%, var(--bg) 62%) fixed;
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex; justify-content:center; -webkit-tap-highlight-color:transparent;
+}
+.app{width:min(440px,100%); min-height:100vh; min-height:100dvh; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px}
+header{display:flex; align-items:center; justify-content:space-between; gap:12px}
+h1{margin:0; font-size:20px}
+h1 .a{color:var(--speech)} h1 .b{color:var(--song)}
+.count{color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums}
+.bar{height:6px; border-radius:3px; background:#ffffff1f; overflow:hidden}
+.bar i{display:block; height:100%; background:linear-gradient(90deg,var(--speech),var(--song)); transition:width .3s}
+#view{display:flex; flex-direction:column; gap:12px; flex:1}
+
+.stage{position:relative; flex:1; min-height:300px; max-height:480px; margin-top:4px}
+.behind,.card{position:absolute; inset:0; border-radius:24px}
+.behind{background:var(--panel); transform:scale(.94) translateY(14px); opacity:.7}
+.card{
+  display:flex; flex-direction:column; padding:20px; overflow:hidden; touch-action:none; cursor:grab; user-select:none;
+  background:linear-gradient(160deg,hsl(var(--h) 55% 38%),hsl(calc(var(--h) + 40) 60% 18%));
+  box-shadow:0 18px 40px #0008; will-change:transform;
+}
+.card:active{cursor:grabbing}
+.mystery{font-size:15px; opacity:.9; letter-spacing:.4px}
+.viz{display:flex; align-items:flex-end; gap:4px; flex:1; min-height:110px; padding:18px 0}
+.viz i{flex:1; background:#ffffffcc; border-radius:3px 3px 0 0; height:6%; transition:height .06s}
+.who{font-size:22px; font-weight:700}
+.sub{margin:4px 0 0; opacity:.9; font-size:15px; min-height:1.4em}
+.dots{display:flex; gap:6px; margin-top:10px; min-height:10px}
+.dots i{width:10px; height:10px; border-radius:50%; background:#ffffff40}
+.dots i.on{background:#fff}
+.stamp{position:absolute; top:28px; padding:2px 12px; border:4px solid; border-radius:10px; font-size:28px; font-weight:800; letter-spacing:2px; opacity:0; pointer-events:none}
+.stamp.song{right:18px; color:var(--song); transform:rotate(14deg)}
+.stamp.speech{left:18px; color:var(--speech); transform:rotate(-14deg)}
+.chip{position:absolute; top:16px; right:16px; padding:4px 12px; border-radius:99px; background:#0006; font-size:14px; font-weight:700}
+
+.controls{display:flex; justify-content:center; align-items:center; gap:14px; padding-top:4px}
+.big{flex:1; max-width:170px; height:58px; border-radius:99px; border:0; font-size:17px; font-weight:800; color:#0b1020; cursor:pointer; box-shadow:0 6px 16px #0006}
+.big.speech{background:var(--speech)} .big.song{background:var(--song)}
+.big[disabled]{opacity:.35; cursor:default}
+.rb{width:46px; height:46px; border-radius:50%; border:0; background:var(--panel); color:var(--ink); font-size:20px; cursor:pointer; box-shadow:0 6px 16px #0006}
+.rb[disabled]{opacity:.35; cursor:default}
+.big:focus-visible,.rb:focus-visible,.btn:focus-visible,.list button:focus-visible,summary:focus-visible{outline:3px solid #fff; outline-offset:3px}
+.hint{text-align:center; color:var(--muted); font-size:13px; margin:0; min-height:1.3em}
+.donebar{display:flex; flex-direction:column; align-items:center; gap:6px}
+.btn.done[disabled]{opacity:.45; cursor:default}
+
+.panel{flex:1; display:flex; flex-direction:column; gap:14px; justify-content:center}
+.panel.top{justify-content:flex-start}
+.panel h2{margin:0; font-size:30px}
+.panel h3{margin:8px 0 0}
+.panel p{margin:0; color:var(--muted)}
+.btn{align-self:flex-start; padding:14px 26px; border:0; border-radius:99px; font-size:17px; font-weight:700; color:#0b1020; background:linear-gradient(90deg,var(--speech),var(--song)); cursor:pointer}
+.btn.ghost{background:var(--panel); color:var(--ink); font-weight:600; font-size:15px; padding:10px 18px}
+.btn[disabled]{opacity:.45; cursor:default}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px}
+.list li{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:14px; background:var(--panel)}
+.list .t,.t{font-size:13px; color:var(--muted)}
+.list a,.t a{color:var(--muted)}
+.list button{border:0; background:#ffffff1f; color:var(--ink); border-radius:99px; padding:6px 12px; cursor:pointer; font-size:14px; flex:none}
+.meter{position:relative; height:8px; border-radius:4px; background:#ffffff1f; margin-top:6px}
+.meter i{position:absolute; top:0; bottom:0; border-radius:4px}
+.meter .m1{background:var(--speech); opacity:.55}
+.meter .m2{background:var(--song); opacity:.9; height:50%; top:25%}
+details{color:var(--muted); font-size:14px}
+summary{cursor:pointer}
+details .list{margin-top:10px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+.err{color:#ffb3c0}
+.check{display:flex; gap:10px; align-items:flex-start; color:var(--ink); font-size:15px}
+.check input{margin-top:4px; width:20px; height:20px; flex:none}
+.check a{color:#ffd37a}
+.draftbar{background:#fff3a3; color:#3a2f00; border-radius:12px; padding:10px 12px; font-size:14px}
+.field{display:flex; flex-direction:column; gap:6px; margin-bottom:14px}
+.field label{font-size:15px; color:var(--ink)}
+.field input,.field select{font:inherit; color:var(--ink); background:var(--panel); border:1px solid #ffffff33; border-radius:12px; padding:10px 12px; width:100%}
+.field input:focus-visible,.field select:focus-visible{outline:3px solid #fff; outline-offset:2px}
+@media (prefers-reduced-motion:reduce){ .bar i,.viz i{transition:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="a">Speech</span> or <span class="b">Song</span>?</h1>
+    <span class="count" id="count"></span>
+  </header>
+  <div class="bar" aria-hidden="true"><i id="prog" style="width:0%"></i></div>
+  <div id="view"></div>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+
+// ---------- settings (task settings can be overridden in config.js under `task`) ----------
+const BLIND = new URLSearchParams(location.search).get('reveal') !== '1';   // ?reveal=1 shows category and text on the cards (for piloting)
+const TASK = Object.assign({
+  design: 'single',        // 'single' = one judgement per phrase; 'repeat' = judge after one hearing, then again after repetitions (speech-to-song illusion paradigm)
+  repetitions: 6,          // times the phrase is heard before the second judgement (Deutsch et al. 2011 used 10)
+  gapMs: 250,              // silence between repetitions
+  practice: 2,             // unscored warm-up trials at the start (an unambiguous speech phrase and an unambiguous song phrase)
+  perRound: 24,            // main trials per round; "keep going" starts another round
+  minDone: 12,             // trials needed before "I'm done" unlocks
+}, (window.SOS_CONFIG && window.SOS_CONFIG.task) || {});
+const CELL_NAMES = {
+  read_en: 'Reading aloud (English)', read_other: 'Reading aloud (other languages)', cc_talk: 'Interviews and talks',
+  fma_spoken: 'Spoken word and podcasts', poetry: 'Poetry readings', rap: 'Rap',
+  song_fma: 'Songs', song_intl: 'Songs (International)'
+};
+const PRACTICE_CELLS = ['read_en', 'song_fma'];
+
+const CFG = (() => {
+  const u = window.SOS_CONFIG || {};
+  return Object.assign({study:'Speech or Song?', consentFile:'consent.html', consentVersion:'unset', participantPrefix:'SOS_'}, u,
+                       {collect: Object.assign({enabled:false, endpoint:'', token:''}, u.collect || {}),
+                        demographics: Object.assign({enabled:false, title:'About you', intro:'', questions:[]}, u.demographics || {}),
+                        minors: Object.assign({enabled:false, mode:'separate', minAge:0, consentFile:'consent_minor.html', consentVersion:'unset',
+                                               participantPrefix:'SOS_U18_', keepQuestions:null}, u.minors || {})});
+})();
+let consent = null, pid = null, startedAt = null, demo = {}, ageGroup = null;
+function makePid(prefix){
+  const q = new URLSearchParams(location.search).get('p');
+  if (q) return prefix + q.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30);
+  const b = new Uint8Array(5); crypto.getRandomValues(b);
+  return prefix + [...b].map(x => x.toString(36).padStart(2, '0')).join('').slice(0, 8).toUpperCase();
+}
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const view = $('view');
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : null;
+function el(tag, props, ...kids){
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})){
+    if (k === 'text') e.textContent = v; else if (k === 'class') e.className = v; else e.setAttribute(k, v);
+  }
+  kids.forEach(k => k != null && e.append(k));
+  return e;
+}
+const hueOf = id => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const pct = (a, b) => b ? Math.round(100 * a / b) : null;
+
+// ---------- corpus ----------
+let clips = [], cells = [];
+function srcKey(c){ return c.source_url || c.id; }
+
+// ---------- audio (Web Audio, so repetitions are sample-accurate and RT is timed from the end of the last repetition) ----------
+let ac = null, analyser = null, curSources = [], pollTimer = 0;
+const bufs = new Map();
+function ensureAudio(){
+  if (!ac){
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = .6;
+    analyser.connect(ac.destination);
+  }
+  if (ac.state === 'suspended') ac.resume();
+}
+function loadBuf(c){
+  if (!bufs.has(c.id)){
+    bufs.set(c.id, fetch('corpus/' + c.file).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+                         .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej))));
+  }
+  return bufs.get(c.id);
+}
+function stopAll(){
+  clearInterval(pollTimer);
+  curSources.forEach(s => { try { s.onended = null; s.stop(); } catch (e) {} });
+  curSources = [];
+}
+// plays `buf` n times; calls onRep(i) as each repetition starts and onEnd() when the last one has finished.
+// Returns the AudioContext time at which the last repetition ends.
+function schedule(buf, n, gapSec, onRep, onEnd){
+  stopAll();
+  const t0 = ac.currentTime + .15, d = buf.duration;
+  for (let i = 0; i < n; i++){
+    const s = ac.createBufferSource(); s.buffer = buf; s.connect(analyser);
+    s.start(t0 + i * (d + gapSec)); curSources.push(s);
+  }
+  const end = t0 + (n - 1) * (d + gapSec) + d;
+  let shown = -1;
+  pollTimer = setInterval(() => {
+    const t = ac.currentTime;
+    const k = Math.min(n - 1, Math.floor((t - t0) / (d + gapSec)));
+    if (t >= t0 && k !== shown){ shown = k; onRep && onRep(k); }
+    if (t >= end){ clearInterval(pollTimer); onEnd && onEnd(); }
+  }, 25);
+  return end;
+}
+
+// ---------- trial plan ----------
+let results, seen, cur, mode, sessionId, round, plan, practiceLeft, phase, endAt, replays1, rt1, judge1, curBuf;
+function drawRound(){
+  // balanced over cells, no source recording twice in a session, never the same cell twice in a row
+  const per = Math.max(1, Math.round(TASK.perRound / cells.length));
+  const picks = [];
+  cells.forEach(cell => {
+    const pool = shuffle(clips.filter(c => c.cell === cell && !seen.has(srcKey(c))));
+    const used = new Set();
+    for (const c of pool){
+      if (used.has(srcKey(c))) continue;
+      used.add(srcKey(c)); picks.push(c);
+      if (used.size >= per) break;
+    }
+  });
+  for (let t = 0; t < 500; t++){
+    shuffle(picks);
+    if (picks.every((c, i) => !i || c.cell !== picks[i - 1].cell)) break;
+  }
+  return picks;
+}
+function drawPractice(){
+  return PRACTICE_CELLS.slice(0, TASK.practice).map(cell => {
+    const pool = clips.filter(c => c.cell === cell && !seen.has(srcKey(c)));
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  }).filter(Boolean);
+}
+const trialsDone = () => results.filter(r => !r.practice).length;
+
+// ---------- views ----------
+let vizRaf = 0;
+function setProgress(){
+  const n = trialsDone();
+  $('prog').style.width = mode === 'play' ? clamp(n / TASK.minDone, 0, 1) * 100 + '%' : mode === 'end' ? '100%' : '0%';
+  $('count').textContent = mode === 'play' ? (practiceLeft > 0 ? 'practice' : `${n} phrase${n === 1 ? '' : 's'}`) : '';
+}
+
+function showIntro(){
+  mode = 'intro'; stopAll(); cancelAnimationFrame(vizRaf); results = []; setProgress();
+  const research = CFG.collect.enabled;
+  const rep = TASK.design === 'repeat';
+  const kids = [
+    research && (/draft/i.test(CFG.consentVersion) || (CFG.minors.enabled && /draft/i.test(CFG.minors.consentVersion))) ? el('div', {class:'draftbar', text:'Draft consent text: for testing only. Do not use with real participants until the IRB has approved it.'}) : null,
+    el('div', {text:'🗣️ ➜ 🎵', style:'font-size:48px;line-height:1.1'}),
+    el('h2', {text:'Is it speech or song?'}),
+    el('p', {text:'You will hear short phrases from real recordings: people reading, talking, rapping and singing, in different languages.'}),
+    el('p', {text: rep ? 'Swipe left if it sounds like speech, right if it sounds like song. Then the phrase repeats, and you decide again. Your first impression and your second one are both useful. Headphones help.'
+                       : 'Swipe left if it sounds like speech, right if it sounds like song. Headphones help.'})
+  ];
+  if (research){
+    const M = CFG.minors;
+    const age = el('input', {type:'number', id:'age', name:'age', inputmode:'numeric', min:'1', max:'110', autocomplete:'off'});
+    const note = el('p', {class:'t', id:'agenote', role:'status'});
+    const agree = el('input', {type:'checkbox', id:'agree'});
+    const link = el('a', {href:CFG.consentFile, target:'_blank', rel:'noopener', text:'consent form'});
+    const lead = el('span', {text:'I have read the '});
+    const tail = el('span', {text:' (opens in a new tab), I am an adult, and I agree to take part.'});
+    const go = el('button', {class:'btn', id:'start', text:'I agree, start'}); go.disabled = true;
+    const solo = el('button', {class:'btn ghost', id:'solo', text:'Just play, don’t share my data'});
+    const refresh = () => {
+      const n = Number(age.value), valid = age.value !== '' && Number.isInteger(n) && n >= 1 && n <= 110;
+      const minor = valid && n < 18;
+      const collectMinors = minor && M.enabled && M.mode === 'separate' && n >= (M.minAge || 0);
+      let can = valid && agree.checked, msg = '';
+      if (age.value !== '' && !valid) msg = 'Please enter your age as a whole number.';
+      if (minor && !collectMinors){
+        can = false;
+        msg = M.enabled ? 'You can play, but nothing is saved for the study at your age. Choose “Just play” below.'
+                        : 'The study is for people 18 and over. You can still play: choose “Just play” below.';
+      } else if (collectMinors){
+        msg = 'Because you are under 18, a parent or guardian needs to read the consent form and agree before you take part. Your answers are kept separate from the adult study.';
+      }
+      link.setAttribute('href', collectMinors ? M.consentFile : CFG.consentFile);
+      lead.textContent = collectMinors ? 'My parent or guardian has read the ' : 'I have read the ';
+      tail.textContent = collectMinors ? ' (opens in a new tab) and agrees that I can take part, and I agree too.'
+                                       : ' (opens in a new tab), I am an adult, and I agree to take part.';
+      note.textContent = msg;
+      go.disabled = !can;
+      return {n};
+    };
+    age.oninput = refresh; agree.onchange = refresh;
+    go.onclick = () => { const r = refresh(); if (!go.disabled) begin(true, r.n); };
+    solo.onclick = () => begin(false, null);
+    kids.push(
+      el('p', {text:'This is a research study by the Auditory Perception & Action Lab. If you agree, you’ll be asked a few optional background questions, and your answers are saved anonymously for the study. No name, email or audio is collected.'}),
+      el('div', {class:'field'}, el('label', {for:'age', text:'Your age in years'}), age),
+      note,
+      el('label', {class:'check'}, agree, el('span', null, lead, link, tail)),
+      el('div', {class:'row'}, go, solo));
+  } else {
+    const go = el('button', {class:'btn', id:'start', text:'Start (sound on)'});
+    go.onclick = () => begin(false);
+    kids.push(go);
+  }
+  kids.push(el('details', null,
+    el('summary', {text:`About the recordings (${clips.length.toLocaleString()} phrases)`}),
+    el('p', {text:'Phrases are short excerpts of LibriVox readings (public domain), Creative Commons interviews and podcasts from the Internet Archive, and tracks from the Free Music Archive, used for non-commercial research. They may contain strong language or mature themes. Each phrase you hear is credited on your results page.'}),
+    el('p', null, el('a', {href:'corpus/credits.csv', download:'speech-or-song-credits.csv', text:'Download the full list of recordings and licences (CSV)'}))));
+  view.replaceChildren(el('div', {class:'panel'}, ...kids));
+  $('start').focus();
+}
+
+function begin(share, ageYears){
+  const M = CFG.minors;
+  ageGroup = ageYears == null ? null : ageYears >= 18 ? 'adult' : 'under18';
+  const minor = ageGroup === 'under18';
+  consent = share && CFG.collect.enabled
+    ? {at: new Date().toISOString(), version: minor ? M.consentVersion : CFG.consentVersion} : null;
+  pid = makePid(minor ? M.participantPrefix : CFG.participantPrefix);
+  startedAt = new Date().toISOString();
+  demo = consent && ageYears != null ? {age: String(ageYears)} : {};
+  const qs = activeQuestions();
+  if (consent && CFG.demographics.enabled && qs.length) showDemographics(qs);
+  else { if (consent) saveSoon(300); start(); }
+}
+function activeQuestions(){
+  const keep = ageGroup === 'under18' && CFG.minors.keepQuestions;
+  return CFG.demographics.questions.filter(q => !(q.id === 'age' && demo.age != null) && (!keep || keep.includes(q.id)));
+}
+
+function showDemographics(qs){
+  mode = 'intro'; setProgress();
+  const D = CFG.demographics, form = el('form', {novalidate: ''});
+  qs.forEach(q => {
+    const id = 'q_' + q.id;
+    let input;
+    if (q.type === 'select'){
+      input = el('select', {id, name: q.id});
+      input.append(el('option', {value: '', text: 'Choose…'}));
+      q.options.forEach(o => input.append(el('option', {value: o, text: o})));
+    } else if (q.type === 'number'){
+      input = el('input', {id, name: q.id, type: 'number', inputmode: 'numeric', autocomplete: 'off'});
+      if (q.min != null) input.min = q.min;
+      if (q.max != null) input.max = q.max;
+    } else {
+      input = el('input', {id, name: q.id, type: 'text', autocomplete: 'off', maxlength: q.maxLength || 60});
+    }
+    form.append(el('div', {class: 'field'}, el('label', {for: id, text: q.label}), q.help ? el('span', {class: 't', text: q.help}) : null, input));
+  });
+  const msg = el('p', {class: 'err', id: 'demoerr', role: 'alert'});
+  form.append(msg, el('div', {class: 'row'}, el('button', {class: 'btn', type: 'submit', text: 'Continue'})));
+  form.onsubmit = e => {
+    e.preventDefault();
+    const out = {};
+    for (const q of qs){
+      let v = String(form.elements[q.id].value || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (q.type === 'number' && v !== ''){
+        const n = Number(v);
+        if (!isFinite(n) || (q.min != null && n < q.min) || (q.max != null && n > q.max)){
+          msg.textContent = `“${q.label}”: please enter a number${q.min != null && q.max != null ? ` between ${q.min} and ${q.max}` : ''}, or leave it blank.`;
+          form.elements[q.id].focus();
+          return;
+        }
+        v = String(Math.round(n));
+      }
+      out[q.id] = v;
+    }
+    demo = Object.assign({}, demo, out);
+    saveSoon(300);
+    start();
+  };
+  view.replaceChildren(el('div', {class: 'panel top'}, el('h2', {text: D.title}), D.intro ? el('p', {text: D.intro}) : null, form));
+  const first = form.querySelector('input,select'); if (first) first.focus();
+}
+
+function start(){
+  ensureAudio();
+  seen = new Set(); results = []; mode = 'play'; round = 0;
+  sessionId = Math.random().toString(36).slice(2, 10);
+  const pr = drawPractice();
+  pr.forEach(c => seen.add(srcKey(c)));
+  practiceLeft = pr.length;
+  plan = pr.map(c => ({c, practice: true}));
+  nextRound();
+  nextTrial();
+}
+function nextRound(){
+  round++;
+  const picks = drawRound();
+  picks.forEach(c => seen.add(srcKey(c)));
+  plan = plan.concat(picks.map(c => ({c, practice: false, round})));
+}
+function nextTrial(){
+  if (!plan.length) nextRound();
+  if (!plan.length){ showResults(); return; }
+  cur = plan.shift();
+  showCard();
+}
+
+async function showCard(){
+  const c = cur.c, rep = TASK.design === 'repeat';
+  phase = 'loading'; judge1 = null; replays1 = 0; rt1 = null;
+  setProgress();
+  const n = trialsDone();
+  const left = Math.max(0, TASK.minDone - n);
+  const bars = el('div', {class:'viz', 'aria-hidden':'true'});
+  for (let i = 0; i < 14; i++) bars.append(el('i'));
+  const dots = el('div', {class:'dots', id:'dots', 'aria-hidden':'true'});
+  for (let i = 0; i < TASK.repetitions; i++) dots.append(el('i'));
+  dots.style.visibility = 'hidden';
+  const sub = el('p', {class:'sub', id:'sub', text:'Loading…'});
+  const card = el('div', {class:'card', id:'card', style:`--h:${hueOf(c.id)}`, 'aria-label':'Mystery phrase'},
+    el('div', {class:'stamp speech', text:'SPEECH'}), el('div', {class:'stamp song', text:'SONG'}),
+    el('div', {class:'mystery', text: cur.practice ? 'Practice' : BLIND ? `Phrase ${n + 1}` : `${CELL_NAMES[c.cell] || c.cell}`}),
+    bars,
+    el('div', null,
+      el('div', {class:'who', id:'who', text: BLIND ? 'Speech or song?' : `“${c.text}”`}),
+      sub, dots));
+  const done = el('button', {class:'btn ghost done', id:'done', text: left ? `Keep going: ${left} more to finish` : 'I’m done: show my results'});
+  if (left || cur.practice) done.disabled = true;
+  view.replaceChildren(
+    el('div', {class:'stage'}, el('div', {class:'behind'}), card),
+    el('div', {class:'controls'},
+      el('button', {class:'big speech', id:'speech', 'aria-label':'Speech (left arrow)', text:'← Speech'}),
+      el('button', {class:'rb', id:'replay', 'aria-label':'Play again', text:'↺'}),
+      el('button', {class:'big song', id:'song', 'aria-label':'Song (right arrow)', text:'Song →'})),
+    el('div', {class:'donebar'},
+      done,
+      el('p', {class:'hint', id:'hint', text:'Listen first, then swipe the card or use ← and →.'})));
+  $('speech').disabled = $('song').disabled = $('replay').disabled = true;
+  $('speech').onclick = () => judge(false);
+  $('song').onclick = () => judge(true);
+  $('replay').onclick = () => { if (phase === 'judge1'){ replays1++; listen1(); } };
+  done.onclick = () => { if (phase !== 'loading' && trialsDone() >= TASK.minDone && !cur.practice) showResults(); };
+  wireDrag(card);
+  runViz();
+  try { curBuf = await loadBuf(c); }
+  catch (e) { sub.textContent = 'This clip could not be loaded. Skipping…'; setTimeout(() => { if (mode === 'play') nextTrial(); }, 900); return; }
+  if (mode !== 'play' || cur.c !== c) return;              // the player left (results) while this clip was loading
+  if (plan[0]) loadBuf(plan[0].c).catch(() => {});        // prefetch the next phrase
+  listen1();
+}
+
+function listen1(){
+  phase = 'listen1';
+  $('speech').disabled = $('song').disabled = $('replay').disabled = true;
+  $('sub').textContent = 'Listen…';
+  $('hint').textContent = '';
+  endAt = schedule(curBuf, 1, 0, null, () => {
+    phase = 'judge1';
+    $('sub').textContent = TASK.design === 'repeat' ? 'Speech or song?' : 'Speech or song?';
+    $('speech').disabled = $('song').disabled = $('replay').disabled = false;
+    $('hint').textContent = 'Drag the card, or use ← and →. ↺ plays it again.';
+  });
+}
+
+function listen2(){
+  phase = 'listen2';
+  const dots = Array.from(document.querySelectorAll('#dots i'));
+  $('dots').style.visibility = 'visible';
+  $('speech').disabled = $('song').disabled = $('replay').disabled = true;
+  $('hint').textContent = '';
+  $('sub').textContent = 'Now it repeats…';
+  endAt = schedule(curBuf, TASK.repetitions, TASK.gapMs / 1000,
+    k => { dots.forEach((d, i) => d.classList.toggle('on', i <= k)); $('sub').textContent = `Repeating: ${k + 1} of ${TASK.repetitions}`; },
+    () => {
+      phase = 'judge2';
+      $('sub').textContent = 'Now: speech or song?';
+      $('speech').disabled = $('song').disabled = false;
+      $('hint').textContent = 'Swipe again, or use ← and →.';
+    });
+}
+
+function runViz(){
+  cancelAnimationFrame(vizRaf);
+  const bars = Array.from(document.querySelectorAll('.viz i')), data = new Uint8Array(analyser.frequencyBinCount);
+  (function frame(){
+    analyser.getByteFrequencyData(data);
+    bars.forEach((b, i) => {
+      const lo = Math.round(2 * Math.pow(90, i / bars.length)), hi = Math.max(lo + 1, Math.round(2 * Math.pow(90, (i + 1) / bars.length)));
+      let m = 0; for (let k = lo; k < hi; k++) m = Math.max(m, data[k]);
+      b.style.height = clamp(6 + Math.pow(m / 255, 2.4) * 94, 6, 100) + '%';
+    });
+    vizRaf = requestAnimationFrame(frame);
+  })();
+}
+
+function wireDrag(card){
+  const sp = card.querySelector('.stamp.speech'), so = card.querySelector('.stamp.song');
+  let sx = 0, dx = 0, down = false, lastT = 0, vx = 0;
+  const canAnswer = () => phase === 'judge1' || phase === 'judge2';
+  const paint = () => {
+    card.style.transform = `translate(${dx}px, ${Math.abs(dx) * .12}px) rotate(${dx / 18}deg)`;
+    so.style.opacity = clamp(dx / 100, 0, 1); sp.style.opacity = clamp(-dx / 100, 0, 1);
+  };
+  card.addEventListener('pointerdown', e => { if (!canAnswer()) return; down = true; sx = e.clientX; dx = 0; vx = 0; lastT = e.timeStamp; card.style.transition = 'none'; card.setPointerCapture(e.pointerId); });
+  card.addEventListener('pointermove', e => {
+    if (!down) return;
+    const nx = e.clientX - sx, dt = Math.max(1, e.timeStamp - lastT);
+    vx = (nx - dx) / dt; dx = nx; lastT = e.timeStamp; paint();
+  });
+  const end = () => {
+    if (!down) return; down = false;
+    if (Math.abs(dx) > 110 || Math.abs(vx) > .8 && Math.abs(dx) > 40) judge(dx > 0);
+    else { card.style.transition = 'transform .25s'; dx = 0; paint(); }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+}
+
+const label = song => song ? 'song' : 'speech';
+function judge(song){
+  if (phase !== 'judge1' && phase !== 'judge2') return;
+  const rt = Math.max(0, Math.round((ac.currentTime - endAt) * 1000));
+  const card = $('card'), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (phase === 'judge1'){
+    judge1 = label(song); rt1 = rt;
+    if (TASK.design === 'repeat'){
+      // the card springs back with a chip showing the first answer, then the phrase repeats
+      card.style.transition = 'transform .3s'; card.style.transform = '';
+      card.querySelectorAll('.stamp').forEach(s => s.style.opacity = 0);
+      card.append(el('div', {class:'chip', text:`First answer: ${judge1}`}));
+      phase = 'between';
+      setTimeout(() => { if (mode === 'play') listen2(); }, reduce ? 200 : 500);
+      return;
+    }
+    finishTrial(judge1, rt1, null, null, card, song, reduce);
+    return;
+  }
+  finishTrial(judge1, rt1, label(song), rt, card, song, reduce);
+}
+
+function finishTrial(j1, r1, j2, r2, card, song, reduce){
+  phase = 'busy';
+  const c = cur.c;
+  results.push({c, practice: cur.practice, round: cur.round || 0, trial: results.length + 1, j1, rt1: r1, replays1, j2, rt2: r2,
+                reps: j2 ? TASK.repetitions : 0});
+  if (cur.practice) practiceLeft--;
+  if (!cur.practice && trialsDone() % 4 === 0) saveSoon(300);
+  stopAll();
+  card.style.transition = reduce ? 'opacity .15s' : 'transform .35s ease-in, opacity .35s';
+  card.style.opacity = 0;
+  if (!reduce) card.style.transform = `translate(${(song ? 1 : -1) * innerWidth}px, -40px) rotate(${song ? 30 : -30}deg)`;
+  setTimeout(() => { if (mode === 'play') nextTrial(); }, reduce ? 160 : 330);
+}
+
+document.addEventListener('keydown', e => {
+  if (mode !== 'play') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); judge(true); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); judge(false); }
+  else if (e.key === ' ' && document.activeElement.tagName !== 'BUTTON' && phase === 'judge1'){ e.preventDefault(); replays1++; listen1(); }
+});
+
+// ---------- data ----------
+function csvCell(v){
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;               // spreadsheet formula guard
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvText(){
+  const demoIds = CFG.demographics.enabled ? CFG.demographics.questions.map(q => q.id) : [];
+  const head = ['participant','session','trial','practice','round','clip_id','cell','group','lang','duration_s','n_words','voiced_frac','f0_sd_st','f0_step_st',
+                'judge1','rt1_ms','replays1','judge2','rt2_ms','repetitions','changed','age_group', ...demoIds.map(id => 'demo_' + id)];
+  const rows = results.map(r => {
+    const c = r.c;
+    return [pid, sessionId, r.trial, r.practice ? 1 : 0, r.round, c.id, c.cell, c.group, c.lang, c.duration, c.n_words, c.voiced_frac, c.f0_sd_st, c.f0_step_st,
+            r.j1, r.rt1, r.replays1, r.j2 || '', r.rt2 == null ? '' : r.rt2, r.reps, r.j2 ? (r.j1 !== r.j2 ? 1 : 0) : '',
+            ageGroup || '', ...demoIds.map(id => demo[id] == null ? '' : demo[id])];
+  });
+  return [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n') + '\n';
+}
+function download(name, text, type){
+  const a = el('a', {href:URL.createObjectURL(new Blob([text], {type})), download:name});
+  document.body.append(a); a.click(); a.remove();
+}
+function downloadCsv(){ download(`speech-or-song-${sessionId}.csv`, csvText(), 'text/csv'); }
+
+const canSend = () => CFG.collect.enabled && !!consent && !!CFG.collect.endpoint && !!pid;
+let sending = null, saveNote = '', saveTimer = 0;
+function sessionJson(){
+  return JSON.stringify({
+    participant: pid, session: sessionId, study: CFG.study, ageGroup, consentVersion: consent && consent.version, consentAt: consent && consent.at,
+    startedAt, savedAt: new Date().toISOString(), trials: trialsDone(), corpus: clips.length, demographics: demo,
+    settings: Object.assign({BLIND}, TASK)
+  }, null, 2);
+}
+function filesNow(){
+  const base = `${pid}_${sessionId}`;
+  return [
+    {name: `${base}_trials.csv`, mime: 'text/csv', text: csvText()},
+    {name: `${base}_session.json`, mime: 'application/json', text: sessionJson()},
+    {name: `${pid}_CONSENT.txt`, mime: 'text/plain', text: `consent_version=${consent.version}\naccepted_at=${consent.at}\nparticipant=${pid}\nage_group=${ageGroup || ''}\n`}
+  ];
+}
+function statusText(){
+  if (!CFG.collect.enabled) return 'Your results stay on this device. Nothing was sent anywhere.';
+  if (!consent) return 'You chose not to share data, so nothing was sent.';
+  if (!CFG.collect.endpoint) return 'Your results are on this device only: the study server is not connected. You can download them below.';
+  if (sending) return 'Saving your results to the study…';
+  if (saveNote === 'saved') return 'Your results were saved to the study. Thank you!';
+  if (saveNote === 'failed') return 'We could not reach the study server. Please download your results below; the researcher will tell you where to send them.';
+  return '';
+}
+function updateSaveStatus(){ const p = $('savestatus'); if (p) p.textContent = statusText(); }
+function flush(){
+  if (!canSend()) return Promise.resolve({skipped: true});
+  if (sending) return sending;
+  sending = (async () => {
+    const body = JSON.stringify({token: CFG.collect.token, participant: pid, group: ageGroup === 'under18' ? 'under18' : 'adult', consentVersion: consent.version, files: filesNow()});
+    let err;
+    for (let i = 0; i < 3; i++){
+      try {
+        const r = await fetch(CFG.collect.endpoint, {method: 'POST', body});   // plain-text body: no CORS preflight (Apps Script)
+        const j = await r.json();
+        if (j && j.ok){ saveNote = 'saved'; return {ok: true}; }
+        err = new Error((j && j.error) || 'rejected');
+      } catch (e) { err = e; }
+      await new Promise(r => setTimeout(r, 600 * (i + 1)));
+    }
+    saveNote = 'failed';
+    return {ok: false, error: String(err)};
+  })().finally(() => { sending = null; updateSaveStatus(); });
+  updateSaveStatus();
+  return sending;
+}
+function saveSoon(ms = 1500){ if (canSend()){ clearTimeout(saveTimer); saveTimer = setTimeout(flush, ms); } }
+addEventListener('pagehide', () => {
+  if (!canSend() || !navigator.sendBeacon || !results || !results.length) return;
+  const body = JSON.stringify({token: CFG.collect.token, participant: pid, group: ageGroup === 'under18' ? 'under18' : 'adult', consentVersion: consent.version, files: filesNow()});
+  if (body.length < 60000) navigator.sendBeacon(CFG.collect.endpoint, new Blob([body], {type: 'text/plain'}));
+});
+
+// ---------- results ----------
+function showResults(){
+  mode = 'end'; stopAll(); cancelAnimationFrame(vizRaf); setProgress();
+  clearTimeout(saveTimer); flush();
+  const R = results.filter(r => !r.practice), rep = TASK.design === 'repeat';
+  const both = R.filter(r => r.j2);
+  const song1 = R.filter(r => r.j1 === 'song').length, song2 = both.filter(r => r.j2 === 'song').length;
+  const toSong = both.filter(r => r.j1 === 'speech' && r.j2 === 'song'), toSpeech = both.filter(r => r.j1 === 'song' && r.j2 === 'speech');
+
+  // per-category table: share of phrases called "song" after one hearing and after repetition
+  const byCell = {};
+  R.forEach(r => { (byCell[r.c.cell] = byCell[r.c.cell] || []).push(r); });
+  const order = cells.filter(k => byCell[k]);
+  const cellLi = k => {
+    const rs = byCell[k], n = rs.length, a = pct(rs.filter(r => r.j1 === 'song').length, n);
+    const b = rep ? pct(rs.filter(r => r.j2 === 'song').length, n) : null;
+    const li = el('li', {style:'flex-direction:column; align-items:stretch; gap:2px'},
+      el('div', {style:'display:flex; justify-content:space-between; gap:10px'},
+        el('span', {text: CELL_NAMES[k] || k}),
+        el('span', {class:'t', text: rep ? `song: ${a}% → ${b}% (${n})` : `song: ${a}% (${n})`})));
+    const m = el('div', {class:'meter', 'aria-hidden':'true'}, el('i', {class:'m1', style:`left:0; width:${a}%`}));
+    if (b != null) m.append(el('i', {class:'m2', style:`left:0; width:${b}%`}));
+    li.append(m);
+    return li;
+  };
+
+  const flipped = toSong.concat(toSpeech);
+  const flipUl = el('ul', {class:'list'});
+  flipped.forEach(r => {
+    const c = r.c, src = safeUrl(c.source_url);
+    const b = el('button', {text:'▶', 'aria-label':'Play this phrase'});
+    b.onclick = async () => { ensureAudio(); const buf = await loadBuf(c); endAt = schedule(buf, 1, 0); };
+    flipUl.append(el('li', null,
+      el('span', null, `“${c.text}”`, el('br'),
+        el('span', {class:'t'}, `${r.j1} → ${r.j2} · ${CELL_NAMES[c.cell] || c.cell} · ${c.creator || ''} · `,
+          src ? el('a', {href:src, target:'_blank', rel:'noopener noreferrer', text:'source'}) : '')), b));
+  });
+
+  const headline = !R.length ? 'No phrases yet.'
+    : !rep ? `You called ${pct(song1, R.length)}% of the ${R.length} phrases songs.`
+    : `After one hearing you called ${pct(song1, R.length)}% of the ${R.length} phrases songs. After they repeated, ${pct(song2, both.length)}%.`;
+  const explain = rep
+    ? `Repetition changed ${toSong.length + toSpeech.length} of your ${both.length} answers: ${toSong.length} went from speech to song, ${toSpeech.length} from song to speech. ` +
+      'This is the “speech-to-song illusion” (Deutsch, Henthorn & Lapidis, 2011): some spoken phrases start to sound sung when they are heard again and again, even though nothing in the sound has changed. Real songs and many ordinary phrases do not shift.'
+    : '';
+
+  const again = el('button', {class:'btn', id:'again', text:'Keep going'});
+  again.onclick = () => { mode = 'play'; nextTrial(); };
+  view.replaceChildren(el('div', {class:'panel top'},
+    el('h2', {text:'Your results'}),
+    el('p', {text: headline}),
+    explain ? el('p', {text: explain}) : null,
+    el('h3', {text:'By kind of recording'}),
+    el('p', {class:'t', text: rep ? 'Thin bar: song after one hearing. Bright bar: song after repetition.' : 'Share of phrases you called song.'}),
+    el('ul', {class:'list'}, ...order.map(cellLi)),
+    rep ? el('details', {open: flipped.length ? '' : null}, el('summary', {text:`Phrases that changed for you (${flipped.length})`}), flipUl) : null,
+    el('p', {class:'t', text:'Recordings: LibriVox (public domain), Internet Archive (Creative Commons) and Free Music Archive (Creative Commons). Each phrase is credited via its source link; the full list is in the CSV on the start page.'}),
+    el('p', {class:'t', id:'savestatus', text:statusText()}),
+    consent ? el('p', {class:'t', text:`Your anonymous participant ID is ${pid}. Keep it if you ever want to ask for your data to be removed.`}) : null,
+    el('div', {class:'row'}, again, el('button', {class:'btn ghost', id:'csv', text:'Download my results (CSV)'}))));
+  $('csv').onclick = downloadCsv;
+  $('live').textContent = 'Your results are ready.';
+}
+
+fetch('corpus/manifest.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(m => {
+    clips = m.clips;
+    cells = Object.keys(CELL_NAMES).filter(k => clips.some(c => c.cell === k));
+    showIntro();
+  })
+  .catch(() => view.replaceChildren(el('div', {class:'panel'}, el('p', {class:'err', text:'Could not load the phrase list. Serve this folder over http (not file://) and make sure corpus/manifest.json exists.'}))));
+</script>
+</body>
+</html>

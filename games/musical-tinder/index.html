@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Musical Tinder</title>
+<meta name="description" content="Swipe right on tracks you would listen to again. The more you swipe, the better it knows your taste. Stop whenever you like and get your top songs.">
+<style>
+:root{ --bg:#14091f; --ink:#fff; --muted:#c4b8d6; --like:#2ee59d; --nope:#ff4d6d; --panel:#25143a; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100vh; min-height:100dvh; color:var(--ink);
+  background:radial-gradient(120% 80% at 50% 0%, #3a1a5c 0%, var(--bg) 60%) fixed;
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex; justify-content:center; -webkit-tap-highlight-color:transparent;
+}
+.app{width:min(440px,100%); min-height:100vh; min-height:100dvh; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px}
+header{display:flex; align-items:center; justify-content:space-between; gap:12px}
+h1{margin:0; font-size:20px}
+h1 span{color:var(--nope)}
+.count{color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums}
+.bar{height:6px; border-radius:3px; background:#ffffff1f; overflow:hidden}
+.bar i{display:block; height:100%; background:linear-gradient(90deg,var(--nope),var(--like)); transition:width .3s}
+#view{display:flex; flex-direction:column; gap:12px; flex:1}
+
+.stage{position:relative; flex:1; min-height:320px; max-height:520px; margin-top:4px}
+.behind,.card{position:absolute; inset:0; border-radius:24px}
+.behind{background:var(--panel); transform:scale(.94) translateY(14px); opacity:.7}
+.card{
+  display:flex; flex-direction:column; padding:20px; overflow:hidden; touch-action:none; cursor:grab; user-select:none;
+  background:linear-gradient(160deg,hsl(var(--h) 65% 42%),hsl(calc(var(--h) + 50) 65% 20%));
+  box-shadow:0 18px 40px #0008; will-change:transform;
+}
+.card:active{cursor:grabbing}
+.mystery{font-size:15px; opacity:.9; letter-spacing:.4px}
+.viz{display:flex; align-items:flex-end; gap:4px; flex:1; min-height:120px; padding:18px 0}
+.viz i{flex:1; background:#ffffffcc; border-radius:3px 3px 0 0; height:6%; transition:height .06s}
+.who{font-size:22px; font-weight:700}
+.sub{margin:4px 0 0; opacity:.85; font-size:15px}
+.stamp{position:absolute; top:28px; padding:2px 12px; border:4px solid; border-radius:10px; font-size:30px; font-weight:800; letter-spacing:2px; opacity:0; pointer-events:none}
+.stamp.like{left:18px; color:var(--like); transform:rotate(-14deg)}
+.stamp.nope{right:18px; color:var(--nope); transform:rotate(14deg)}
+
+.controls{display:flex; justify-content:center; align-items:center; gap:20px; padding-top:4px}
+.rb{width:64px; height:64px; border-radius:50%; border:0; background:var(--panel); color:var(--ink); font-size:28px; cursor:pointer; box-shadow:0 6px 16px #0006}
+.rb.sm{width:46px; height:46px; font-size:20px}
+.rb.no{color:var(--nope)} .rb.yes{color:var(--like)}
+.rb:focus-visible,.btn:focus-visible,.list button:focus-visible,summary:focus-visible,.seg button:focus-visible{outline:3px solid #fff; outline-offset:3px}
+.hint{text-align:center; color:var(--muted); font-size:13px; margin:0}
+.donebar{display:flex; flex-direction:column; align-items:center; gap:6px}
+.btn.done[disabled]{opacity:.45; cursor:default}
+
+.panel{flex:1; display:flex; flex-direction:column; gap:14px; justify-content:center}
+.panel.top{justify-content:flex-start}
+.panel h2{margin:0; font-size:30px}
+.panel h3{margin:8px 0 0}
+.panel p{margin:0; color:var(--muted)}
+.btn{align-self:flex-start; padding:14px 26px; border:0; border-radius:99px; font-size:17px; font-weight:700; color:#14091f; background:linear-gradient(90deg,#ff7a93,#ffc46b); cursor:pointer}
+.btn.ghost{background:var(--panel); color:var(--ink); font-weight:600; font-size:15px; padding:10px 18px}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.seg{display:inline-flex; background:var(--panel); border-radius:99px; padding:3px}
+.seg button{border:0; background:none; color:var(--muted); padding:8px 16px; border-radius:99px; font-size:15px; font-weight:600; cursor:pointer}
+.seg button[aria-pressed="true"]{background:#ffffff26; color:var(--ink)}
+.list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px}
+.list li{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:14px; background:var(--panel)}
+.list .t{font-size:13px; color:var(--muted)}
+.list a{color:var(--muted)}
+.list button{border:0; background:#ffffff1f; color:var(--ink); border-radius:99px; padding:6px 12px; cursor:pointer; font-size:14px; flex:none}
+details{color:var(--muted); font-size:14px}
+summary{cursor:pointer}
+details .list{margin-top:10px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+.err{color:#ffb3c0}
+.check{display:flex; gap:10px; align-items:flex-start; color:var(--ink); font-size:15px}
+.check input{margin-top:4px; width:20px; height:20px; flex:none}
+.check a{color:#ffc46b}
+.draftbar{background:#fff3a3; color:#3a2f00; border-radius:12px; padding:10px 12px; font-size:14px}
+.btn[disabled]{opacity:.45; cursor:default}
+.field{display:flex; flex-direction:column; gap:6px; margin-bottom:14px}
+.field label{font-size:15px; color:var(--ink)}
+.field .t{font-size:13px; color:var(--muted)}
+.field input,.field select{font:inherit; color:var(--ink); background:var(--panel); border:1px solid #ffffff33; border-radius:12px; padding:10px 12px; width:100%}
+.field input:focus-visible,.field select:focus-visible{outline:3px solid #fff; outline-offset:2px}
+@media (prefers-reduced-motion:reduce){ .bar i,.viz i{transition:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Musical <span>Tinder</span></h1>
+    <span class="count" id="count"></span>
+  </header>
+  <div class="bar" aria-hidden="true"><i id="prog" style="width:0%"></i></div>
+  <div id="view"></div>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+
+// ---------- settings ----------
+const EXPLORE_N = 10;        // swipes that are always random (genre-balanced) before the model may choose
+const MIN_LIKES = 3, MIN_PASSES = 3;   // the model needs both kinds of answer before it is trusted
+const EXPLOIT_P = .75;       // once ready: share of cards chosen by the model (the rest stay random)
+const TOPK = 30;             // model picks a random card from its top K, so runs do not repeat
+const MIN_DONE = 10;         // swipes needed before "I'm done" unlocks
+const LIST_SIZES = [10, 25];
+const CTRL_SHARE = .1;       // share of each top list that is random (a baseline); set to 0 to turn off
+const GENRE_REPEAT_PENALTY = .06, SIM_WEIGHT = .15;
+const EXCLUDE_GENRES = ['Spoken'];      // spoken word belongs to the what-is-music game, not taste
+const FEATS = ['Genre', 'Tempo', 'Brightness', 'Dynamics', 'Vocals'];
+const BLIND = new URLSearchParams(location.search).get('reveal') !== '1';   // ?reveal=1 shows titles on the cards
+
+const CFG = (() => {
+  const u = window.MT_CONFIG || {};
+  return Object.assign({study:'Musical Tinder', consentFile:'consent.html', consentVersion:'unset', participantPrefix:'MT_'}, u,
+                       {collect: Object.assign({enabled:false, endpoint:'', token:''}, u.collect || {}),
+                        demographics: Object.assign({enabled:false, title:'About you', intro:'', questions:[]}, u.demographics || {}),
+                        minors: Object.assign({enabled:false, mode:'separate', minAge:0, consentFile:'consent_minor.html', consentVersion:'unset',
+                                               participantPrefix:'MT_U18_', keepQuestions:null}, u.minors || {})});
+})();
+let consent = null, pid = null, startedAt = null, demo = {}, ageGroup = null;   // ageGroup: 'adult' | 'under18' | null (not asked)     // consent = {at, version} once the player agrees
+function makePid(prefix){
+  const q = new URLSearchParams(location.search).get('p');
+  if (q) return prefix + q.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30);
+  const b = new Uint8Array(5); crypto.getRandomValues(b);
+  return prefix + [...b].map(x => x.toString(36).padStart(2, '0')).join('').slice(0, 8).toUpperCase();
+}
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const view = $('view');
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : null;
+function el(tag, props, ...kids){
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})){
+    if (k === 'text') e.textContent = v; else if (k === 'class') e.className = v; else e.setAttribute(k, v);
+  }
+  kids.forEach(k => k != null && e.append(k));
+  return e;
+}
+const hueOf = id => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+
+// ---------- corpus ----------
+let clips = [], numStats = null;
+const metaCache = new Map();
+function buildClips(ix){
+  clips = ix.id.map((tid, i) => ({
+    id: 'fma' + tid, tid, ar: ix.ar ? ix.ar[i] : tid, file: `fma/${tid}.mp3`, genre: ix.genres[ix.g[i]],
+    instrumental: !!ix.v[i], nc: !!ix.nc[i],
+    features: {tempo: ix.bpm[i], tempo_band: ix.bands.tempo[ix.t[i]], brightness: ix.hz[i], brightness_band: ix.bands.brightness[ix.b[i]],
+               dynamics: ix.dyn[i], dynamics_band: ix.bands.dynamics[ix.d[i]]}
+  })).filter(c => !EXCLUDE_GENRES.includes(c.genre));
+  const cols = clips.map(c => [c.features.tempo, Math.log(c.features.brightness), c.features.dynamics]);
+  numStats = [0, 1, 2].map(k => {
+    const v = cols.map(r => r[k]), m = v.reduce((a, b) => a + b, 0) / v.length;
+    return {m, sd: Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1};
+  });
+}
+const numVec = c => [c.features.tempo, Math.log(c.features.brightness), c.features.dynamics].map((x, k) => (x - numStats[k].m) / numStats[k].sd);
+
+// titles, artists and licence links come in 1000-track shards, only for tracks that are actually shown
+async function ensureMeta(list){
+  const need = [...new Set(list.filter(c => !c.title).map(c => Math.floor(c.tid / 1000)))];
+  need.forEach(k => { if (!metaCache.has(k)) metaCache.set(k, fetch(`corpus/meta/${k}.json`).then(r => r.json())); });
+  for (const c of list){
+    if (c.title) continue;
+    const m = (await metaCache.get(Math.floor(c.tid / 1000)))[c.tid] || {};
+    c.title = m.t || 'Unknown title'; c.artist = m.a || 'Unknown artist';
+    c.licence = m.l || ''; c.licence_url = m.lu || ''; c.source_url = m.su || '';
+  }
+}
+const traits = c => ({
+  Genre: c.genre, Tempo: c.features.tempo_band, Brightness: c.features.brightness_band,
+  Dynamics: c.features.dynamics_band, Vocals: c.instrumental ? 'Instrumental' : 'Vocals'
+});
+
+// ---------- audio ----------
+let ac = null, analyser = null, audio = null, playStart = 0;
+function ensureAudio(){
+  if (!audio){
+    audio = new Audio(); audio.preload = 'auto';
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ac.createMediaElementSource(audio);
+    analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = .6;
+    src.connect(analyser); analyser.connect(ac.destination);
+  }
+  if (ac.state === 'suspended') ac.resume();
+}
+function play(c, isReplay){
+  ensureAudio();
+  if (!isReplay) { audio.src = 'corpus/' + c.file; playStart = 0; }   // rt is timed from first onset, not from replays
+  audio.loop = true; audio.onended = null;
+  audio.currentTime = 0;
+  audio.onplaying = () => { if (!playStart) playStart = performance.now(); };
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => { const h = $('hint'); if (h) h.textContent = 'Tap the ↺ button to start the sound.'; });
+}
+function stop(){ if (audio) audio.pause(); }
+
+// ---------- taste model ----------
+let stats, results, seen, cur, busy, mode, sessionId, replays, ratingLog;
+const key = (f, v) => f + ':' + v;
+function score(c){                     // naive-Bayes-style average of per-trait like rates, Laplace-smoothed
+  const t = traits(c); let s = 0;
+  for (const f of FEATS){ const st = stats[key(f, t[f])] || {like:0, seen:0}; s += (st.like + 1) / (st.seen + 2); }
+  return s / FEATS.length;
+}
+function learn(c, liked){
+  const t = traits(c);
+  for (const f of FEATS){ const st = stats[key(f, t[f])] || (stats[key(f, t[f])] = {like:0, seen:0}); st.seen++; if (liked) st.like++; }
+}
+const nLikes = () => results.filter(r => r.liked).length;
+const modelReady = () => results.length >= EXPLORE_N && nLikes() >= MIN_LIKES && results.length - nLikes() >= MIN_PASSES;
+
+// all unseen tracks, best first. r = trait score plus a small pull toward the average sound of liked tracks
+function rankUnseen(){
+  const lv = results.filter(r => r.liked).map(r => numVec(r.card));
+  const cen = lv.length ? [0, 1, 2].map(k => lv.reduce((a, v) => a + v[k], 0) / lv.length) : null;
+  const sim = c => { if (!cen) return 0; const v = numVec(c); return Math.exp(-.5 * v.reduce((a, x, k) => a + (x - cen[k]) ** 2, 0) / 3); };
+  return clips.filter(c => !seen.has(c.id)).map(c => { const s = score(c); return {c, s, r: s + SIM_WEIGHT * sim(c)}; })
+              .sort((x, y) => y.r - x.r);
+}
+function randomCard(){
+  // uniform over genres, then uniform within the genre, so rare genres get explored; never the same genre twice in a row
+  const by = {};
+  clips.forEach(c => { if (!seen.has(c.id)) (by[c.genre] = by[c.genre] || []).push(c); });
+  let gs = Object.keys(by);
+  const last = results.length ? results[results.length - 1].card.genre : null;
+  if (gs.length > 1) gs = gs.filter(g => g !== last);
+  return pickOne(by[pickOne(gs)]);
+}
+function pickNext(){
+  const ready = modelReady();
+  let c, source;
+  if (ready && Math.random() < EXPLOIT_P){ c = pickOne(rankUnseen().slice(0, TOPK)).c; source = 'model'; }
+  else { c = randomCard(); source = ready ? 'explore' : 'random'; }
+  return {card: c, source, pred: ready ? score(c) : null};      // pred is logged, never shown
+}
+
+// ---------- views ----------
+let vizRaf = 0;
+function setProgress(){
+  const n = results.length;
+  $('prog').style.width = mode === 'play' ? clamp(n / MIN_DONE, 0, 1) * 100 + '%' : mode === 'end' ? '100%' : '0%';
+  $('count').textContent = mode === 'play' ? `${n} swipe${n === 1 ? '' : 's'}` : '';
+}
+
+function showIntro(){
+  mode = 'intro'; stop(); cancelAnimationFrame(vizRaf); results = []; setProgress();
+  const research = CFG.collect.enabled;
+  const kids = [
+    research && (/draft/i.test(CFG.consentVersion) || (CFG.minors.enabled && /draft/i.test(CFG.minors.consentVersion))) ? el('div', {class:'draftbar', text:'Draft consent text: for testing only. Do not use with real participants until the IRB has approved it.'}) : null,
+    el('div', {text:'🎧', style:'font-size:64px;line-height:1'}),
+    el('h2', {text:'Find your tune.'}),
+    el('p', {text:'Songs play one at a time. Swipe right on the ones you’d listen to again, left on the rest.'}),
+    el('p', {text:'At first they’re random. The more you swipe, the more the choices narrow toward your taste. Stop whenever you like and get your top songs. Headphones help.'})
+  ];
+  if (research){
+    const M = CFG.minors;
+    const age = el('input', {type:'number', id:'age', name:'age', inputmode:'numeric', min:'1', max:'110', autocomplete:'off'});
+    const note = el('p', {class:'t', id:'agenote', role:'status'});
+    const agree = el('input', {type:'checkbox', id:'agree'});
+    const link = el('a', {href:CFG.consentFile, target:'_blank', rel:'noopener', text:'consent form'});
+    const lead = el('span', {text:'I have read the '});
+    const tail = el('span', {text:' (opens in a new tab), I am an adult, and I agree to take part.'});
+    const go = el('button', {class:'btn', id:'start', text:'I agree, start swiping'}); go.disabled = true;
+    const solo = el('button', {class:'btn ghost', id:'solo', text:'Just play, don’t share my data'});
+    const refresh = () => {
+      const n = Number(age.value), valid = age.value !== '' && Number.isInteger(n) && n >= 1 && n <= 110;
+      const minor = valid && n < 18;
+      const collectMinors = minor && M.enabled && M.mode === 'separate' && n >= (M.minAge || 0);
+      let can = valid && agree.checked, msg = '';
+      if (age.value !== '' && !valid) msg = 'Please enter your age as a whole number.';
+      if (minor && !collectMinors){
+        can = false;
+        msg = M.enabled ? 'You can play, but nothing is saved for the study at your age. Choose “Just play” below.'
+                        : 'The study is for people 18 and over. You can still play: choose “Just play” below.';
+      } else if (collectMinors){
+        msg = 'Because you are under 18, a parent or guardian needs to read the consent form and agree before you take part. Your answers are kept separate from the adult study.';
+      }
+      link.setAttribute('href', collectMinors ? M.consentFile : CFG.consentFile);
+      lead.textContent = collectMinors ? 'My parent or guardian has read the ' : 'I have read the ';
+      tail.textContent = collectMinors ? ' (opens in a new tab) and agrees that I can take part, and I agree too.'
+                                       : ' (opens in a new tab), I am an adult, and I agree to take part.';
+      note.textContent = msg;
+      go.disabled = !can;
+      return {n};
+    };
+    age.oninput = refresh; agree.onchange = refresh;
+    go.onclick = () => { const r = refresh(); if (!go.disabled) begin(true, r.n); };
+    solo.onclick = () => begin(false, null);
+    kids.push(
+      el('p', {text:'This is a research study by the Auditory Perception & Action Lab. If you agree, you’ll be asked a few optional background questions, and your answers are saved anonymously for the study. No name, email or audio is collected.'}),
+      el('div', {class:'field'}, el('label', {for:'age', text:'Your age in years'}), age),
+      note,
+      el('label', {class:'check'}, agree, el('span', null, lead, link, tail)),
+      el('div', {class:'row'}, go, solo));
+  } else {
+    const go = el('button', {class:'btn', id:'start', text:'Start swiping (sound on)'});
+    go.onclick = () => begin(false);
+    kids.push(go);
+  }
+  kids.push(el('details', null,
+    el('summary', {text:`About the music (${clips.length.toLocaleString()} tracks)`}),
+    el('p', {text:'All tracks are from the Free Music Archive under Creative Commons licences, used for non-commercial research. The tracks you hear are credited, with their licences, on your results page.'}),
+    el('p', null, el('a', {href:'corpus/credits.csv', download:'musical-tinder-credits.csv', text:'Download the full list of tracks and licences (CSV)'}))));
+  view.replaceChildren(el('div', {class:'panel'}, ...kids));
+  $('start').focus();
+}
+
+function begin(share, ageYears){
+  const M = CFG.minors;
+  ageGroup = ageYears == null ? null : ageYears >= 18 ? 'adult' : 'under18';
+  const minor = ageGroup === 'under18';
+  consent = share && CFG.collect.enabled
+    ? {at: new Date().toISOString(), version: minor ? M.consentVersion : CFG.consentVersion} : null;
+  pid = makePid(minor ? M.participantPrefix : CFG.participantPrefix);
+  startedAt = new Date().toISOString();
+  demo = consent && ageYears != null ? {age: String(ageYears)} : {};     // age comes from the start page, so it is not asked again
+  const qs = activeQuestions();
+  if (consent && CFG.demographics.enabled && qs.length) showDemographics(qs);
+  else { if (consent) saveSoon(300); start(); }
+}
+function activeQuestions(){
+  const keep = ageGroup === 'under18' && CFG.minors.keepQuestions;
+  return CFG.demographics.questions.filter(q => !(q.id === 'age' && demo.age != null) && (!keep || keep.includes(q.id)));
+}
+
+// background questions, shown once after consent; all optional, saved with the data
+function showDemographics(qs){
+  mode = 'intro'; setProgress();
+  const D = CFG.demographics, form = el('form', {novalidate: ''});
+  qs.forEach(q => {
+    const id = 'q_' + q.id;
+    let input;
+    if (q.type === 'select'){
+      input = el('select', {id, name: q.id});
+      input.append(el('option', {value: '', text: 'Choose…'}));
+      q.options.forEach(o => input.append(el('option', {value: o, text: o})));
+    } else if (q.type === 'number'){
+      input = el('input', {id, name: q.id, type: 'number', inputmode: 'numeric', autocomplete: 'off'});
+      if (q.min != null) input.min = q.min;
+      if (q.max != null) input.max = q.max;
+    } else {
+      input = el('input', {id, name: q.id, type: 'text', autocomplete: 'off', maxlength: q.maxLength || 60});
+    }
+    form.append(el('div', {class: 'field'}, el('label', {for: id, text: q.label}), q.help ? el('span', {class: 't', text: q.help}) : null, input));
+  });
+  const msg = el('p', {class: 'err', id: 'demoerr', role: 'alert'});
+  form.append(msg, el('div', {class: 'row'}, el('button', {class: 'btn', type: 'submit', text: 'Continue'})));
+  form.onsubmit = e => {
+    e.preventDefault();
+    const out = {};
+    for (const q of qs){
+      let v = String(form.elements[q.id].value || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (q.type === 'number' && v !== ''){
+        const n = Number(v);
+        if (!isFinite(n) || (q.min != null && n < q.min) || (q.max != null && n > q.max)){
+          msg.textContent = `“${q.label}”: please enter a number${q.min != null && q.max != null ? ` between ${q.min} and ${q.max}` : ''}, or leave it blank.`;
+          form.elements[q.id].focus();
+          return;
+        }
+        v = String(Math.round(n));
+      }
+      out[q.id] = v;
+    }
+    demo = Object.assign({}, demo, out);
+    saveSoon(300);                 // the answers are kept even if the player leaves before swiping
+    start();
+  };
+  view.replaceChildren(el('div', {class: 'panel top'}, el('h2', {text: D.title}), D.intro ? el('p', {text: D.intro}) : null, form));
+  const first = form.querySelector('input,select'); if (first) first.focus();
+}
+
+function start(){
+  ensureAudio();
+  stats = {}; results = []; seen = new Set(); busy = false; mode = 'play'; replays = 0; ratingLog = new Map();
+  sessionId = Math.random().toString(36).slice(2, 10);
+  cur = pickNext();
+  showCard();
+}
+
+async function showCard(){
+  const c = cur.card;
+  seen.add(c.id);
+  setProgress();
+  replays = 0;
+  if (!BLIND) await ensureMeta([c]);
+  const left = Math.max(0, MIN_DONE - results.length);
+  const bars = el('div', {class:'viz', 'aria-hidden':'true'});
+  for (let i = 0; i < 14; i++) bars.append(el('i'));
+  const card = el('div', {class:'card', id:'card', style:`--h:${hueOf(c.id)}`, 'aria-label':'Mystery track'},
+    el('div', {class:'stamp like', text:'LIKE'}), el('div', {class:'stamp nope', text:'NOPE'}),
+    el('div', {class:'mystery', text:BLIND ? `Mystery track ${results.length + 1}` : c.genre}),
+    bars,
+    el('div', null,
+      el('div', {class:'who', text: BLIND ? 'Would you listen again?' : c.title}),
+      el('p', {class:'sub', text: BLIND ? 'Swipe right for yes, left for no.' : c.artist})));
+  const done = el('button', {class:'btn ghost done', id:'done', text: left ? `Keep going: ${left} more to unlock your top songs` : 'I’m done: show my top songs'});
+  if (left) done.disabled = true;
+  view.replaceChildren(
+    el('div', {class:'stage'}, el('div', {class:'behind'}), card),
+    el('div', {class:'controls'},
+      el('button', {class:'rb sm', id:'replay', 'aria-label':'Replay from the start', text:'↺'}),
+      el('button', {class:'rb no', id:'no', 'aria-label':'Pass (left arrow)', text:'✕'}),
+      el('button', {class:'rb yes', id:'yes', 'aria-label':'Like (right arrow)', text:'♥'})),
+    el('div', {class:'donebar'},
+      done,
+      el('p', {class:'hint', id:'hint', text:'Drag the card, or use ← and → keys. Space replays.'})));
+  $('live').textContent = `Track ${results.length + 1}.`;
+  $('no').onclick = () => decide(false);
+  $('yes').onclick = () => decide(true);
+  $('replay').onclick = () => { replays++; play(c, true); };
+  done.onclick = () => { if (!busy && results.length >= MIN_DONE) showResults(); };
+  wireDrag(card);
+  play(c);
+  runViz();
+}
+
+function runViz(){
+  cancelAnimationFrame(vizRaf);
+  const bars = Array.from(document.querySelectorAll('.viz i')), data = new Uint8Array(analyser.frequencyBinCount);
+  (function frame(){
+    analyser.getByteFrequencyData(data);
+    bars.forEach((b, i) => {   // log-spaced bins, roughly 45 Hz to 4 kHz
+      const lo = Math.round(2 * Math.pow(90, i / bars.length)), hi = Math.max(lo + 1, Math.round(2 * Math.pow(90, (i + 1) / bars.length)));
+      let m = 0; for (let k = lo; k < hi; k++) m = Math.max(m, data[k]);
+      b.style.height = clamp(6 + Math.pow(m / 255, 2.4) * 94, 6, 100) + '%';
+    });
+    vizRaf = requestAnimationFrame(frame);
+  })();
+}
+
+function wireDrag(card){
+  const like = card.querySelector('.stamp.like'), nope = card.querySelector('.stamp.nope');
+  let sx = 0, dx = 0, down = false, lastT = 0, vx = 0;
+  const paint = () => {
+    card.style.transform = `translate(${dx}px, ${Math.abs(dx) * .12}px) rotate(${dx / 18}deg)`;
+    like.style.opacity = clamp(dx / 100, 0, 1); nope.style.opacity = clamp(-dx / 100, 0, 1);
+  };
+  card.addEventListener('pointerdown', e => { if (busy) return; down = true; sx = e.clientX; dx = 0; vx = 0; lastT = e.timeStamp; card.style.transition = 'none'; card.setPointerCapture(e.pointerId); });
+  card.addEventListener('pointermove', e => {
+    if (!down) return;
+    const nx = e.clientX - sx, dt = Math.max(1, e.timeStamp - lastT);
+    vx = (nx - dx) / dt; dx = nx; lastT = e.timeStamp; paint();
+  });
+  const end = () => {
+    if (!down) return; down = false;
+    if (Math.abs(dx) > 110 || Math.abs(vx) > .8 && Math.abs(dx) > 40) decide(dx > 0);
+    else { card.style.transition = 'transform .25s'; dx = 0; paint(); }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+}
+
+function decide(liked){
+  if (busy || mode !== 'play') return;
+  busy = true;
+  const card = $('card');
+  const rt = playStart ? Math.round(performance.now() - playStart) : null;
+  results.push({card: cur.card, liked, pred: cur.pred, source: cur.source, rt, replays, trial: results.length + 1});
+  learn(cur.card, liked);
+  if (results.length % 5 === 0) saveSoon(300);
+  stop();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  card.style.transition = reduce ? 'opacity .15s' : 'transform .35s ease-in, opacity .35s';
+  card.style.opacity = 0;
+  if (!reduce) card.style.transform = `translate(${(liked ? 1 : -1) * innerWidth}px, -40px) rotate(${liked ? 30 : -30}deg)`;
+  setTimeout(() => { busy = false; cur = pickNext(); showCard(); }, reduce ? 160 : 330);
+}
+
+// ---------- results: the top list ----------
+let listN = LIST_SIZES[0], playlist = [], plIdx = -1, plOn = false;
+
+function buildList(N){
+  const nCtrl = Math.round(N * CTRL_SHARE), nRec = N - nCtrl;
+  const pool = rankUnseen(), picks = [], genres = {}, artists = new Set();
+  while (picks.length < nRec && pool.length){     // greedy: best rank, minus a nudge for repeating a genre; one per artist
+    let bi = 0, bv = -Infinity;
+    pool.forEach((x, i) => {
+      const v = x.r - GENRE_REPEAT_PENALTY * (genres[x.c.genre] || 0) - (artists.has(x.c.ar) ? 1 : 0);
+      if (v > bv){ bv = v; bi = i; }
+    });
+    const x = pool.splice(bi, 1)[0];
+    picks.push({c:x.c, s:x.s, source:'recommended', rating:null});
+    genres[x.c.genre] = (genres[x.c.genre] || 0) + 1; artists.add(x.c.ar);
+  }
+  const ctrl = shuffle(pool.filter(x => !artists.has(x.c.ar))).slice(0, nCtrl)
+    .map(x => ({c:x.c, s:x.s, source:'random', rating:null}));
+  const rec = picks;                                // keep our picks in rank order; slot random ones in at random places
+  ctrl.forEach(x => rec.splice(Math.floor(Math.random() * (rec.length + 1)), 0, x));
+  return rec;
+}
+
+function markPlaying(){
+  document.querySelectorAll('[data-pl]').forEach(li => {
+    const i = +li.dataset.pl, on = i === plIdx && plOn;
+    li.style.outline = on ? '2px solid var(--like)' : '';
+    const b = li.querySelector('.pp');
+    b.textContent = on ? '⏸' : '▶';
+    b.setAttribute('aria-label', (on ? 'Pause ' : 'Play ') + playlist[i].c.title);
+  });
+}
+function playTrack(i){
+  ensureAudio();
+  plIdx = i; plOn = true;
+  audio.loop = false;
+  audio.src = 'corpus/' + playlist[i].c.file;
+  audio.onended = () => { if (plIdx + 1 < playlist.length) playTrack(plIdx + 1); else { plOn = false; markPlaying(); } };
+  const p = audio.play(); if (p && p.catch) p.catch(() => { plOn = false; markPlaying(); });
+  markPlaying();
+}
+function toggleTrack(i){ if (plIdx === i && plOn){ audio.pause(); plOn = false; markPlaying(); } else playTrack(i); }
+
+function listSummary(){
+  const rated = playlist.filter(p => p.rating);
+  if (!rated.length) return 'Rate the tracks with 👍 or 👎 to see how well we did.';
+  const up = s => rated.filter(p => p.source === s && p.rating === 'up').length;
+  const tot = s => rated.filter(p => p.source === s).length;
+  return `Our picks: you liked ${up('recommended')} of ${tot('recommended')} rated.` +
+         (tot('random') ? ` Random tracks: ${up('random')} of ${tot('random')}.` : '');
+}
+
+function renderList(into){
+  plIdx = -1; plOn = false; stop();
+  playlist = buildList(listN);
+  ensureMeta(playlist.map(p => p.c)).then(() => {
+    const summary = el('p', {id:'plsum', text:listSummary()});
+    const ul = el('ul', {class:'list'});
+    playlist.forEach((p, i) => {
+      const pp = el('button', {class:'pp', text:'▶', 'aria-label':`Play ${p.c.title}`});
+      pp.onclick = () => toggleTrack(i);
+      const up = el('button', {text:'👍', 'aria-label':`Like ${p.c.title}`, 'aria-pressed':'false'});
+      const dn = el('button', {text:'👎', 'aria-label':`Dislike ${p.c.title}`, 'aria-pressed':'false'});
+      const tag = el('span', {class:'pltag'});
+      const rate = r => {
+        p.rating = r;
+        ratingLog.set(p.c.id, {pos: i + 1, n: playlist.length, source: p.source, rating: r, pred: p.s, c: p.c});
+        up.setAttribute('aria-pressed', r === 'up'); dn.setAttribute('aria-pressed', r === 'down');
+        up.style.background = r === 'up' ? 'var(--like)' : ''; dn.style.background = r === 'down' ? 'var(--nope)' : '';
+        summary.textContent = listSummary(); $('live').textContent = summary.textContent;
+        saveSoon();
+        if (playlist.every(x => x.rating)) document.querySelectorAll('.pltag').forEach((t, k) => { t.textContent = playlist[k].source === 'random' ? ' · random pick' : ' · our pick'; });
+      };
+      up.onclick = () => rate('up'); dn.onclick = () => rate('down');
+      const src = safeUrl(p.c.source_url);
+      ul.append(el('li', {'data-pl': i},
+        el('span', null, `${i + 1}. ${p.c.title}`, el('br'),
+          el('span', {class:'t'}, `${p.c.artist} · ${p.c.genre} · `, src ? el('a', {href:src, target:'_blank', rel:'noopener noreferrer', text:'source'}) : '', tag)),
+        el('span', {class:'row', style:'flex-wrap:nowrap;gap:6px'}, pp, up, dn)));
+    });
+    into.replaceChildren(ul, summary);
+  });
+}
+
+function download(name, text, type){
+  const a = el('a', {href:URL.createObjectURL(new Blob([text], {type})), download:name});
+  document.body.append(a); a.click(); a.remove();
+}
+function saveList(){
+  const lines = playlist.map((p, i) => `${i + 1}. ${p.c.title} - ${p.c.artist} (${p.c.genre})\n   ${p.c.licence}\n   ${p.c.source_url}`);
+  download('musical-tinder-top-songs.txt', `Your Musical Tinder top ${playlist.length}\n\n` + lines.join('\n') +
+           '\n\nMusic: Free Music Archive, Creative Commons licences (see links above).\n', 'text/plain');
+}
+function csvCell(v){
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;               // spreadsheet formula guard
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvText(){
+  const demoIds = CFG.demographics.enabled ? CFG.demographics.questions.map(q => q.id) : [];
+  const head = ['participant','session','phase','trial','clip_id','genre','tempo','tempo_band','brightness_band','dynamics_band','vocals',
+                'decision','rt_ms','replays','model_pred','source','list_position','list_size','age_group', ...demoIds.map(id => 'demo_' + id)];
+  const row = (phase, trial, c, decision, rt, reps, pred, source, pos, n) => {
+    const t = traits(c);
+    return [pid, sessionId, phase, trial, c.id, c.genre, c.features.tempo, t.Tempo, t.Brightness, t.Dynamics, t.Vocals,
+            decision, rt, reps, pred == null ? '' : pred.toFixed(3), source, pos, n, ageGroup || '', ...demoIds.map(id => demo[id] == null ? '' : demo[id])];
+  };
+  const rows = [
+    ...results.map(r => row('swipe', r.trial, r.card, r.liked ? 'like' : 'pass', r.rt, r.replays, r.pred, r.source, '', '')),
+    ...[...ratingLog.values()].map(x => row('list', '', x.c, x.rating === 'up' ? 'like' : 'pass', '', '', x.pred, x.source, x.pos, x.n))
+  ];
+  return [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n') + '\n';
+}
+function downloadCsv(){ download(`musical-tinder-${sessionId}.csv`, csvText(), 'text/csv'); }
+
+// ---------- saving to the lab (only after the player has agreed, and only if an endpoint is set) ----------
+const canSend = () => CFG.collect.enabled && !!consent && !!CFG.collect.endpoint && !!pid;
+let sending = null, saveNote = '', saveTimer = 0;
+function sessionJson(){
+  return JSON.stringify({
+    participant: pid, session: sessionId, study: CFG.study, ageGroup, consentVersion: consent && consent.version, consentAt: consent && consent.at,
+    startedAt, savedAt: new Date().toISOString(), swipes: results.length, catalogue: clips.length, demographics: demo,
+    settings: {EXPLORE_N, MIN_LIKES, MIN_PASSES, EXPLOIT_P, TOPK, MIN_DONE, CTRL_SHARE, SIM_WEIGHT, GENRE_REPEAT_PENALTY, BLIND}
+  }, null, 2);
+}
+function filesNow(){
+  const base = `${pid}_${sessionId}`;
+  return [
+    {name: `${base}_swipes.csv`, mime: 'text/csv', text: csvText()},
+    {name: `${base}_session.json`, mime: 'application/json', text: sessionJson()},
+    {name: `${pid}_CONSENT.txt`, mime: 'text/plain', text: `consent_version=${consent.version}\naccepted_at=${consent.at}\nparticipant=${pid}\nage_group=${ageGroup || ''}\n`}
+  ];
+}
+function statusText(){
+  if (!CFG.collect.enabled) return 'Your results stay on this device. Nothing was sent anywhere.';
+  if (!consent) return 'You chose not to share data, so nothing was sent.';
+  if (!CFG.collect.endpoint) return 'Your results are on this device only: the study server is not connected. You can download them below.';
+  if (sending) return 'Saving your results to the study…';
+  if (saveNote === 'saved') return 'Your results were saved to the study. Thank you!';
+  if (saveNote === 'failed') return 'We could not reach the study server. Please download your results below; the researcher will tell you where to send them.';
+  return '';
+}
+function updateSaveStatus(){ const p = $('savestatus'); if (p) p.textContent = statusText(); }
+function flush(){
+  if (!canSend()) return Promise.resolve({skipped: true});
+  if (sending) return sending;
+  sending = (async () => {
+    const body = JSON.stringify({token: CFG.collect.token, participant: pid, group: ageGroup === 'under18' ? 'under18' : 'adult', consentVersion: consent.version, files: filesNow()});
+    let err;
+    for (let i = 0; i < 3; i++){
+      try {
+        const r = await fetch(CFG.collect.endpoint, {method: 'POST', body});   // plain-text body: no CORS preflight (Apps Script)
+        const j = await r.json();
+        if (j && j.ok){ saveNote = 'saved'; return {ok: true}; }
+        err = new Error((j && j.error) || 'rejected');
+      } catch (e) { err = e; }
+      await new Promise(r => setTimeout(r, 600 * (i + 1)));
+    }
+    saveNote = 'failed';
+    return {ok: false, error: String(err)};
+  })().finally(() => { sending = null; updateSaveStatus(); });
+  updateSaveStatus();
+  return sending;
+}
+function saveSoon(ms = 1500){ if (canSend()){ clearTimeout(saveTimer); saveTimer = setTimeout(flush, ms); } }
+// last-chance save when the page is closed or hidden
+addEventListener('pagehide', () => {
+  if (!canSend() || !navigator.sendBeacon || !results || !results.length) return;
+  const body = JSON.stringify({token: CFG.collect.token, participant: pid, group: ageGroup === 'under18' ? 'under18' : 'adult', consentVersion: consent.version, files: filesNow()});
+  if (body.length < 60000) navigator.sendBeacon(CFG.collect.endpoint, new Blob([body], {type: 'text/plain'}));
+});
+
+async function showResults(){
+  mode = 'end'; stop(); cancelAnimationFrame(vizRaf); setProgress();
+  clearTimeout(saveTimer); flush();
+  const likedCards = results.filter(r => r.liked);
+  await ensureMeta(likedCards.map(r => r.card));
+
+  const tr = Object.entries(stats).filter(([, s]) => s.seen >= 3)
+    .map(([k, s]) => ({k: k.split(':')[1], rate: (s.like + 1) / (s.seen + 2), s})).sort((a, b) => b.rate - a.rate);
+  const loves = tr.filter(t => t.rate > .5).slice(0, 3), hates = tr.slice().reverse().filter(t => t.rate < .5).slice(0, 2);
+  const traitLi = (sym, t) => el('li', null, el('span', {text:`${sym} ${t.k}`}), el('span', {class:'t', text:`${t.s.like} of ${t.s.seen} liked`}));
+
+  const listBox = el('div');
+  const seg = el('div', {class:'seg', role:'group', 'aria-label':'List length'});
+  LIST_SIZES.forEach(n => {
+    const b = el('button', {text:`Top ${n}`, 'aria-pressed': String(n === listN)});
+    b.onclick = () => { listN = n; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderList(listBox); };
+    seg.append(b);
+  });
+  const likedUl = el('ul', {class:'list'});
+  likedCards.forEach(r => {
+    const c = r.card, src = safeUrl(c.source_url), b = el('button', {text:'Play', 'aria-label':`Play ${c.title}`});
+    b.onclick = () => { plOn = false; plIdx = -1; markPlaying(); play(c); };
+    likedUl.append(el('li', null,
+      el('span', null, `♥ ${c.title}`, el('br'),
+        el('span', {class:'t'}, `${c.artist} · ${c.genre} · `, src ? el('a', {href:src, target:'_blank', rel:'noopener noreferrer', text:'source'}) : '')), b));
+  });
+  const playAll = el('button', {class:'btn', text:'▶ Play all'}); playAll.onclick = () => playlist.length && playTrack(0);
+  const save = el('button', {class:'btn ghost', text:'Save list (.txt)'}); save.onclick = saveList;
+
+  view.replaceChildren(el('div', {class:'panel top'},
+    el('h2', {text:'Your top songs'}),
+    el('p', {text:`Based on your ${results.length} swipes (${likedCards.length} likes). These are tracks you haven’t heard yet, picked from ${clips.length.toLocaleString()}. A few may be mixed in at random, so rate them honestly.`}),
+    el('div', {class:'row'}, seg, playAll, save),
+    listBox,
+    el('h3', {text:'Your type'}),
+    el('ul', {class:'list'}, ...(loves.length ? loves.map(t => traitLi('♥', t)) : [el('li', null, el('span', {text:'Nothing stood out yet.'}))]), ...hates.map(t => traitLi('✕', t))),
+    el('details', null, el('summary', {text:`Songs you liked (${likedCards.length})`}), likedUl),
+    el('p', {class:'t', text:'Music: Free Music Archive, Creative Commons licences (see the source links).'}),
+    el('p', {class:'t', id:'savestatus', text:statusText()}),
+    consent ? el('p', {class:'t', text:`Your anonymous participant ID is ${pid}. Keep it if you ever want to ask for your data to be removed.`}) : null,
+    el('div', {class:'row'},
+      el('button', {class:'btn', id:'again', text:'Swipe again'}),
+      el('button', {class:'btn ghost', id:'csv', text:'Download my results (CSV)'}))));
+  $('again').onclick = start;
+  $('csv').onclick = downloadCsv;
+  $('live').textContent = 'Your top songs are ready.';
+  renderList(listBox);
+}
+
+document.addEventListener('keydown', e => {
+  if (mode !== 'play') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); decide(true); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); decide(false); }
+  else if (e.key === ' ' && document.activeElement.tagName !== 'BUTTON') { e.preventDefault(); replays++; play(cur.card, true); }
+});
+
+fetch('corpus/index.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(ix => { buildClips(ix); showIntro(); })
+  .catch(() => view.replaceChildren(el('div', {class:'panel'}, el('p', {class:'err', text:'Could not load the music list. Serve this folder over http (not file://) and make sure corpus/index.json exists.'}))));
+</script>
+</body>
+</html>
